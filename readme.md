@@ -7,6 +7,7 @@ this project2 demonstrates:
     @app.route('/MLR', methods=['GET'])
 
 What is next:
-* Get time and display time/forecast based on time
+* Get time and display time/forecast based on time => DONE
+* Consider night & weekend
 * Save forecasted data to CSV file (make sure do not save duplicate entry)
 * Plot from CSV
