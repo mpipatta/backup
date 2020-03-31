@@ -1,5 +1,6 @@
 # Dependencies
 from flask import Flask, request, jsonify, json
+from flask import render_template
 from sklearn.externals import joblib
 import traceback
 import pandas as pd
@@ -7,26 +8,73 @@ import numpy as np
 from getCUBEMS import loaddata
 from getWEATHER import loadtemp
 from keras.models import model_from_json, load_model
-from datetime import datetime
+from datetime import datetime, time
 
 app = Flask(__name__)
 
+@app.route('/chartforecast', methods=['GET'])
+def chartforecast():
+    df2 = pd.read_csv('output.csv')
+    start = df2.iloc[0,0]
+    end = df2.iloc[df2.count()[0]-1,0]
+    df2['Datetime'] = pd.to_datetime(df2['Datetime'],format="%Y-%m-%d %H:%M:%S")
+    df2.set_index('Datetime', inplace=True)
+    datetime_index = pd.date_range(start, end, freq='60min')
+    data = df2.reindex(datetime_index)
+    data['actual'] = data['Lt'].shift(-1)
+    data.interpolate(method='linear', inplace=True)
+    data.fillna(0, inplace=True)
+    legend = 'Actual'
+    legend2 = 'Predicted LSTM'
+    actual = list(data.actual.values)
+    predicted = list(data.Lt1LSTM.values)
+    times = list(np.arange(len(actual)))
+    return render_template('chart.html', values=actual, values2=predicted, labels=times, legend=legend, legend2=legend2)
+
+ 
+@app.route('/timechart', methods=['GET'])
+def timechart():
+    legend = 'Temperatures'
+    legend2 = 'Temperatures2'
+    temperatures = [73.7, 73.4, 73.8, 72.8, 68.7, 65.2,
+                    61.8, 58.7, 58.2, 58.3, 60.5, 65.7,
+                    70.2, 71.4, 71.2, 70.9, 71.3, 71.1]
+    temperatures2 = [77.7, 75.4, 78, 78, 77, 68,
+                    61.8, 58.7, 58.2, 58.3, 60.5, 65.7,
+                    70.2, 71.4, 71.2, 70.9, 71.3, 71.1]
+    times = [time(hour=11, minute=14, second=15),
+             time(hour=11, minute=14, second=30),
+             time(hour=11, minute=14, second=45),
+             time(hour=11, minute=15, second=00),
+             time(hour=11, minute=15, second=15),
+             time(hour=11, minute=15, second=30),
+             time(hour=11, minute=15, second=45),
+             time(hour=11, minute=16, second=00),
+             time(hour=11, minute=16, second=15),
+             time(hour=11, minute=16, second=30),
+             time(hour=11, minute=16, second=45),
+             time(hour=11, minute=17, second=00),
+             time(hour=11, minute=17, second=15),
+             time(hour=11, minute=17, second=30),
+             time(hour=11, minute=17, second=45),
+             time(hour=11, minute=18, second=00),
+             time(hour=11, minute=18, second=15),
+             time(hour=11, minute=18, second=30)]
+    return render_template('time_chart.html', values=temperatures, values2=temperatures2, labels=times, legend=legend, legend2=legend2)
+
+ 
 #automatically load the result when the page is loaded
 @app.route('/MLR', methods=['GET'])
 def MLR():
     now = datetime.now()
-
-    #check number of rows in the csv output file
-    num_rows = 0
-    for row in open('output.csv'):
-        num_rows += 1
     
     #get data from output to df2
     df2 = pd.read_csv('output.csv')
-  
+    num_rows = df2.count()[0]
+
     #if datetime of the last row equals current hour, 
     #do the forecast and write the output
-    if (df2.iloc[num_rows-2,0] != now.strftime("%Y-%m-%d %H:00")):
+    if (df2.iloc[num_rows-1,0] != now.strftime("%Y-%m-%d %H:00")):
        
         #get load data from CUBEMS and temperature from weather.com
         load = loaddata()
@@ -112,7 +160,7 @@ if __name__ == '__main__':
 
     # Load MLR model
     regressor = joblib.load("modelMLR.pkl") # Load "model.pkl"
-    print ('ANN model loaded')
+    print ('MLR model loaded')
 
     # Load ANN model 
     modelANN = load_model('modelANN.h5')
